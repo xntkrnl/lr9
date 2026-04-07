@@ -1,0 +1,75 @@
+﻿<Window x:Class="lr9.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:lr9"
+        xmlns:avalonedit="http://icsharpcode.net/sharpdevelop/avalonedit"
+        mc:Ignorable="d"
+        Title="MainWindow"
+        MinHeight="1000"
+        MinWidth="1000"
+        MaxHeight="1000"
+        MaxWidth="1000">
+
+    <TabControl x:Name="MainTabControl" Margin="10">
+        <TabItem x:Name="ResultTab" Header="Результат">
+            <TabControl x:Name="ResultTabControl" Margin="10">
+            </TabControl>
+        </TabItem>
+        <TabItem x:Name="CodeTab" Header="Код">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <avalonedit:TextEditor
+                    x:Name="CommandBox"
+                     Text=""
+                     VerticalScrollBarVisibility="Auto"
+                     Margin="10"/>
+
+                <Grid Grid.Row="1" Margin="10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock x:Name="CurrentFileText"
+                               Text="Новый файл"
+                               VerticalAlignment="Center"
+                               FontWeight="Bold"/>
+
+                    <StackPanel Orientation="Horizontal" Grid.Column="1" HorizontalAlignment="Right">
+                        <Button x:Name="ExecuteButton"
+                                Content="Выполнить"
+                                Height="30"
+                                Width="100"
+                                Margin="0,0,5,0"
+                                Click="Execute_Click"/>
+
+                        <Button x:Name="LoadButton"
+                                Content="Открыть"
+                                Height="30"
+                                Width="100"
+                                Margin="0,0,5,0"
+                                Click="LoadFromFile"/>
+
+                        <Button x:Name="SaveButton"
+                                Content="Сохранить"
+                                Height="30"
+                                Width="100"
+                                Margin="0,0,5,0"
+                                Click="SaveFile"/>
+
+                        <Button x:Name="SaveAsButton"
+                                Content="Сохранить как..."
+                                Height="30"
+                                Width="120"
+                                Click="SaveAsFile"/>
+                    </StackPanel>
+                </Grid>
+            </Grid>
+        </TabItem>
+    </TabControl>
+</Window>
