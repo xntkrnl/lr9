@@ -27,6 +27,12 @@ namespace lr9.Code
             "savepoint"
         };
 
+        private List<string> blacklist = new List<string>
+        {
+            "pg_",
+            "version()"
+        };
+
         public async Task<bool> ExecuteCommands(string commands, MainWindow mainWindow)
         {
             mainWindow.ResultTabControl.Items.Clear();
@@ -38,7 +44,7 @@ namespace lr9.Code
                 foreach (var query in queries)
                 {
                     var qLower = query.Trim().ToLower();
-                    if (!whitelist.Any(w => qLower.StartsWith(w)) || qLower.Contains("pg_"))
+                    if (!whitelist.Any(w => qLower.StartsWith(w)) || blacklist.Any(b => qLower.Contains(b)))
                     {
                         MessageBox.Show($"Запрещенная команда в безопасном режиме: {query}");
                         return false;
