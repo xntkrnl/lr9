@@ -38,7 +38,7 @@ namespace lr9.Code
                 foreach (var query in queries)
                 {
                     var qLower = query.Trim().ToLower();
-                    if (!whitelist.Any(w => qLower.StartsWith(w)))
+                    if (!whitelist.Any(w => qLower.StartsWith(w)) || qLower.Contains("pg_"))
                     {
                         MessageBox.Show($"Запрещенная команда в безопасном режиме: {query}");
                         return false;
@@ -171,6 +171,7 @@ namespace lr9.Code
                 }
 
                 MessageBox.Show("Ошибка выполнения SQL. Подробности записаны в лог.");
+                //логирование идет сюда, не реализовано
                 return false;
             }
         }
