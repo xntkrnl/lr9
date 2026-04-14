@@ -1,9 +1,6 @@
 ﻿using Npgsql;
 using System;
-using System.Collections.Generic;
 using System.Data;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
 
@@ -11,33 +8,55 @@ namespace lr9.Code
 {
     public class DBLoginManager : Singleton<DBLoginManager>
     {
-        private NpgsqlConnection connection;
+        // store connection string instead of a long-lived connection object
+        private string? connectionString;
 
         public DBLoginManager()
         {
-            connection = new NpgsqlConnection();
         }
 
         public async Task<bool> TryConnect(string ip, string port, string database, string username, string password)
         {
             try
             {
-                connection.ConnectionString = $"Host={ip};Port={port};Database={database};Username={username};Password={password}";
-                await connection.OpenAsync();
+                var builder = new NpgsqlConnectionStringBuilder
+                {
+                    Host = ip,
+                    Port = int.Parse(port),
+                    Database = database,
+                    Username = username,
+                    Password = password,
+
+                    SslMode = SslMode.Require,
+
+                    Timeout = 5
+                };
+
+                // Валидация
+                var tmp = new NpgsqlConnection(builder.ConnectionString);
+                await tmp.OpenAsync();
+                await tmp.CloseAsync();
+
+                connectionString = builder.ConnectionString;
+
                 return true;
             }
-            catch (Exception e)
+            catch (Exception)
             {
-                MessageBox.Show($"Ошибка подключения:\n{e.Message}");
+                // Общее сообщение об ошибке, чтобы не раскрывать детали подключения
+                MessageBox.Show("Не удалось подключиться. Проверьте хост, порт, учетные данные и сеть.");
                 return false;
             }
         }
-        public NpgsqlConnection GetConnection()
-        {
-            if (connection.State != ConnectionState.Open)
-                connection.Open();
 
-            return connection;
+        public async Task<NpgsqlConnection> GetOpenConnectionAsync()
+        {
+            if (string.IsNullOrEmpty(connectionString))
+                throw new InvalidOperationException("Нет действительного подключения. Сначала вызовите TryConnect.");
+
+            var conn = new NpgsqlConnection(connectionString);
+            await conn.OpenAsync();
+            return conn;
         }
     }
 }

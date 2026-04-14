@@ -3,6 +3,7 @@ using Npgsql;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Principal;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
@@ -24,6 +25,14 @@ namespace lr9
         public LoginWindow()
         {
             InitializeComponent();
+            SafeModeCheckBox.IsEnabled = IsRunAsAdmin();
+        }
+
+        public static bool IsRunAsAdmin()
+        {
+            WindowsIdentity identity = WindowsIdentity.GetCurrent();
+            WindowsPrincipal principal = new WindowsPrincipal(identity);
+            return principal.IsInRole(WindowsBuiltInRole.Administrator);
         }
 
         private async void Login_Click(object sender, RoutedEventArgs e)
@@ -33,6 +42,9 @@ namespace lr9
             string database = databaseBox.Text;
             string login = UsernameBox.Text;
             string password = PasswordBox.Password;
+
+            bool safeMode = SafeModeCheckBox.IsChecked ?? false;
+            DBCommandManager.Instance.safeMode = safeMode;
 
             LoginButton.IsEnabled = false;
             var result = await DBLoginManager.Instance.TryConnect(ip, port, database, login, password);
