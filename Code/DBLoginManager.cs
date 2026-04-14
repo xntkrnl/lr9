@@ -8,7 +8,6 @@ namespace lr9.Code
 {
     public class DBLoginManager : Singleton<DBLoginManager>
     {
-        // store connection string instead of a long-lived connection object
         private string? connectionString;
 
         public DBLoginManager()
@@ -25,11 +24,7 @@ namespace lr9.Code
                     Port = int.Parse(port),
                     Database = database,
                     Username = username,
-                    Password = password,
-
-                    SslMode = SslMode.Require,
-
-                    Timeout = 5
+                    Password = password
                 };
 
                 // Валидация

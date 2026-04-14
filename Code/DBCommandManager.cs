@@ -32,7 +32,7 @@ namespace lr9.Code
             mainWindow.ResultTabControl.Items.Clear();
 
             List<string> queries = SplitSqlStatements(commands);
-            
+
             if (safeMode)
             {
                 foreach (var query in queries)
@@ -61,97 +61,118 @@ namespace lr9.Code
             bool needToGoToResultsTab = false;
             int totalRows = 0;
             bool autoTransactionStarted = false;
+            NpgsqlTransaction? transaction = null;
 
-            foreach (string query in queries)
+            try
             {
-                if (string.IsNullOrWhiteSpace(query)) continue;
-
-                var qLower = query.Trim().ToLower();
-
-                if (qLower.StartsWith("begin"))
+                foreach (string query in queries)
                 {
-                    if (transaction != null)
-                        throw new Exception("Уже есть активная транзакция");
-                    transaction = await connection.BeginTransactionAsync();
-                    continue;
-                }
-                else if (qLower.StartsWith("commit"))
-                {
-                    if (transaction == null)
-                        throw new Exception("Нет активной транзакции");
-                    await transaction.CommitAsync();
-                    transaction = null;
-                    autoTransactionStarted = false;
-                    continue;
-                }
-                else if (qLower.StartsWith("rollback"))
-                {
-                    if (transaction == null)
-                        throw new Exception("Нет активной транзакции");
+                    if (string.IsNullOrWhiteSpace(query)) continue;
 
-                    if (qLower.StartsWith("rollback to"))
+                    var qLower = query.Trim().ToLower();
+
+                    if (qLower.StartsWith("begin"))
                     {
-                        string spName = query.Substring("rollback to".Length).TrimEnd(';', ' ');
-                        await transaction.RollbackAsync(spName);
+                        if (transaction != null)
+                            throw new Exception("Уже есть активная транзакция");
+                        transaction = await connection.BeginTransactionAsync();
+                        continue;
+                    }
+                    else if (qLower.StartsWith("commit"))
+                    {
+                        if (transaction == null)
+                            throw new Exception("Нет активной транзакции");
+                        await transaction.CommitAsync();
+                        await transaction.DisposeAsync();
+                        transaction = null;
+                        autoTransactionStarted = false;
+                        continue;
+                    }
+                    else if (qLower.StartsWith("rollback"))
+                    {
+                        if (transaction == null)
+                            throw new Exception("Нет активной транзакции");
+
+                        if (qLower.StartsWith("rollback to"))
+                        {
+                            string spName = query.Substring("rollback to".Length).TrimEnd(';', ' ');
+                            await transaction.RollbackAsync(spName);
+                        }
+                        else
+                        {
+                            await transaction.RollbackAsync();
+                            await transaction.DisposeAsync();
+                            transaction = null;
+                            autoTransactionStarted = false;
+                        }
+                        continue;
+                    }
+                    else if (qLower.StartsWith("savepoint"))
+                    {
+                        if (transaction == null)
+                            throw new Exception("Нет активной транзакции");
+
+                        string spName = query.Substring("savepoint".Length).TrimEnd(';', ' ');
+                        await transaction.SaveAsync(spName);
+                        continue;
+                    }
+
+                    bool isSelectLike = qLower.StartsWith("select") || qLower.StartsWith("explain");
+                    if (!isSelectLike && transaction == null && !safeMode)
+                    {
+                        transaction = await connection.BeginTransactionAsync();
+                        autoTransactionStarted = true;
+                    }
+
+                    using var command = transaction != null
+                        ? new NpgsqlCommand(query, connection, transaction)
+                        : new NpgsqlCommand(query, connection);
+
+                    command.CommandTimeout = 30;
+
+                    if (isSelectLike)
+                    {
+                        using var reader = await command.ExecuteReaderAsync();
+                        DataTable table = new DataTable();
+                        table.Load(reader);
+
+                        mainWindow.CreateNewResultTab(table);
+                        needToGoToResultsTab = true;
                     }
                     else
                     {
-                        await transaction.RollbackAsync();
-                        transaction = null;
-                        autoTransactionStarted = false;
+                        int rows = await command.ExecuteNonQueryAsync();
+                        totalRows += rows;
                     }
-                    continue;
                 }
-                else if (qLower.StartsWith("savepoint"))
+
+                if (autoTransactionStarted && transaction != null)
                 {
-                    if (transaction == null)
-                        throw new Exception("Нет активной транзакции");
-
-                    string spName = query.Substring("savepoint".Length).TrimEnd(';', ' ');
-                    await transaction.SaveAsync(spName);
-                    continue;
+                    await transaction.CommitAsync();
+                    await transaction.DisposeAsync();
+                    transaction = null;
                 }
 
-                bool isSelectLike = qLower.StartsWith("select") || qLower.StartsWith("explain");
-                if (!isSelectLike && transaction == null && !safeMode)
-                {
-                    transaction = await connection.BeginTransactionAsync();
-                    autoTransactionStarted = true;
-                }
+                if (totalRows > 0)
+                    MessageBox.Show($"Операция успешна. Затронуто строк: {totalRows}");
 
-                NpgsqlCommand command = transaction != null
-                    ? new NpgsqlCommand(query, connection, transaction)
-                    : new NpgsqlCommand(query, connection);
+                if (needToGoToResultsTab)
+                    mainWindow.SelectResultTab();
 
-                if (isSelectLike)
-                {
-                    using var reader = await command.ExecuteReaderAsync();
-                    DataTable table = new DataTable();
-                    table.Load(reader);
-
-                    mainWindow.CreateNewResultTab(table);
-                    needToGoToResultsTab = true;
-                }
-                else
-                {
-                    int rows = await command.ExecuteNonQueryAsync();
-                    totalRows += rows;
-                }
+                return true;
             }
-
-            if (autoTransactionStarted && transaction != null)
+            catch (Exception e)
             {
-                await transaction.CommitAsync();
-                transaction = null;
+                if (transaction != null)
+                {
+                    try { await transaction.RollbackAsync(); } catch { }
+                    await transaction.DisposeAsync();
+                    transaction = null;
+                }
+
+                MessageBox.Show("Ошибка выполнения SQL. Подробности записаны в лог.");
+                return false;
             }
-
-            if (totalRows > 0)
-                MessageBox.Show($"Операция успешна. Затронуто строк: {totalRows}");
-
-            if (needToGoToResultsTab)
-                mainWindow.SelectResultTab();
-
-            return true;
         }
         public List<string> SplitSqlStatements(string sql)
         {
